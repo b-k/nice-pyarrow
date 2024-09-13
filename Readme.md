@@ -113,12 +113,12 @@ A query with all the options for a `NiceData` table `d` might look like
       `"max"`, `"min"`, `"mean"` or `"avg"`, `"count"`.
 - The `group_by` tells us whether the aggregation is over subsets. If absent, use the entire table.
   As of this writing, takes only one column name.
-- Specify the `weights` column if you need a weighted sum or other aggregation. If you
+- Specify the `weight` column if you need a weighted sum or other aggregation. If you
   want a count and weights are set, I ignore your `select` clause and assume you want a total weight
   in the groups or the full data set.
-- If `weights_normalize==True`  (the default) and `weights` is provided, and you are aggregating,
-  scale by `1./sum(weights)` after multiplying by the weights column. Set to `False` for sums with
-  replicate weights or if you are very confident that `sum(weights)==1`.
+- If `weight_normalize==True`  (the default) and `weight` is provided, and you are aggregating,
+  scale by `1./sum(weight)` after multiplying by the weights column. Set to `False` for sums with
+  replicate weights or if you are very confident that `sum(weight)==1`.
 
 Output given aggregation is a Pandas data frame whose index is the `group_by` column if there is one,
 and whose columns are your `select` columns.
