@@ -7,7 +7,7 @@ _length = lambda x: len(x)
 
 #Aggregations add '_sum' or '_avg' &c to column names, and it's work for users to track
 #how to refer to their data. Remove the aggregation appendage.
-remove_agg = lambda s: '_'.join(s.split('_')[0:-1]) if '_' in s else s
+remove_agg = lambda s, g: '_'.join(s.split('_')[0:-1]) if '_' in s and s!=g else s
 
 def maybe_subelmt(indata) -> Union[pa.ChunkedArray, float, int, list]:
     return (indata.vec if isinstance(indata, NiceVec)
@@ -23,7 +23,7 @@ class NiceVec:
     
     def __sub__(self, other: Union['NiceVec', float, int]) -> 'NiceVec':
         return NiceVec(pc.subtract(self.vec, maybe_subelmt(other)))
-    
+
     def __mul__(self, other: Union['NiceVec', float, int]) -> 'NiceVec':
         return NiceVec(pc.multiply(self.vec,  maybe_subelmt(other)))
     
@@ -201,7 +201,8 @@ class NiceTab:
                    "min" if statistic=="min" else
                    "max" if statistic=="max" else
                    "count" if statistic=="count" else "error")
-            return grouped.aggregate([(s, stat) for s in select]).sort_by(group_by[0])
+            out = grouped.aggregate([(s, stat) for s in select]).sort_by(group_by[0])
+            return out.rename_columns([remove_agg(c, group_by[0]) for c in out.column_names])
         stat= (pc.sum if statistic is None or statistic=="sum" else
                pc.mean if statistic=="mean" or statistic=="avg" or statistic=="average" else
                pc.min if statistic=="min" else
@@ -209,7 +210,8 @@ class NiceTab:
                _length if statistic=="count" and not weight else
                lambda _: intab[weight].sum() if statistic=="count"
                else "error")
-        return pa.Table.from_arrays([pa.array([stat(intab[c])]) for c in select], names=select)
+        #cast to as_py because pa.arrays sometimes can't be constructed using pyarrow.DoubleScalars
+        return pa.Table.from_arrays([pa.array([stat(intab[c]).as_py()]) for c in select], names=select)
 
     def Q(self, select: Union[str, List[str]]=[],
                 where: Union['NiceTab', Callable] = [],
@@ -234,9 +236,8 @@ class NiceTab:
         if len(where)>0: out = out.filter(where.vec)
 
         if len(group_by) > 0 or aggregation is not None:
-            if weight: out = NiceTab(out)._build_weighted_tab(select, group_by, weight, weight_normalize) 
+            if weight: out = NiceTab(out)._build_weighted_tab(select, group_by, weight, weight_normalize)
             out = self._apply_aggregation(out, select, group_by, aggregation, weight, weight_normalize)
-            out = out.rename_columns([remove_agg(c) for c in out.column_names])
         
         if html_out is not None:
             h_out = open(f"out/{html_out}.html", append)
